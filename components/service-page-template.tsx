@@ -2,11 +2,14 @@
 
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { DynamicFooter } from "@/components/dynamic-footer"
 import { WhatsAppFloat } from "@/components/whatsapp-float"
+import { AutoBreadcrumb } from "@/components/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { MapPin, Phone, Star, CheckCircle, MessageCircle, Clock } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { DOMAIN_PAGES } from "@/lib/domain-pages-data"
 
 interface ServicePageProps {
   title: string
@@ -20,6 +23,29 @@ interface ServicePageProps {
   seoKeywords: string[]
   content: string
   faqs: Array<{ question: string; answer: string }>
+  domain?: string // Optional domain for DynamicFooter links
+  location?: string // Location name for DynamicFooter
+}
+
+// Helper to extract location from domain
+function getLocationFromDomain(domain: string): string {
+  // Remove www. and extract meaningful name
+  const clean = domain.replace(/^www\./, '').split('.')[0]
+  
+  // Handle common patterns
+  if (clean.startsWith('safawala')) {
+    const city = clean.replace('safawala', '')
+    return city.charAt(0).toUpperCase() + city.slice(1)
+  }
+  if (clean.startsWith('sharmaji')) {
+    return 'Sharmaji Safawala'
+  }
+  
+  // General fallback - capitalize and add spaces before capitals
+  return clean
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .trim() || 'Safawala'
 }
 
 export function ServicePageTemplate({
@@ -34,6 +60,8 @@ export function ServicePageTemplate({
   seoKeywords,
   content,
   faqs,
+  domain,
+  location,
 }: ServicePageProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -42,6 +70,26 @@ export function ServicePageTemplate({
     count: "",
     preference: "",
   })
+  
+  // Auto-detect domain from hostname when not provided
+  const [detectedDomain, setDetectedDomain] = useState<string | null>(null)
+  
+  useEffect(() => {
+    if (!domain && typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+        .replace(/^www\./, '')
+        .toLowerCase()
+      
+      // Check if this hostname has pages in our data
+      if (DOMAIN_PAGES[hostname]) {
+        setDetectedDomain(hostname)
+      }
+    }
+  }, [domain])
+  
+  // Use provided domain or detected domain
+  const effectiveDomain = domain || detectedDomain
+  const effectiveLocation = location || (effectiveDomain ? getLocationFromDomain(effectiveDomain) : null)
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -56,6 +104,13 @@ export function ServicePageTemplate({
   return (
     <main className="min-h-screen">
       <Navigation />
+      
+      {/* Breadcrumb for SEO */}
+      <AutoBreadcrumb 
+        pageTitle={title} 
+        category="Services" 
+        domain={effectiveDomain || undefined} 
+      />
 
       {/* Hero Section */}
       <section className="pt-24 sm:pt-28 md:pt-32 pb-10 md:pb-16 bg-gradient-to-br from-primary to-primary/80 text-white">
@@ -490,7 +545,11 @@ export function ServicePageTemplate({
         </div>
       </section>
 
-      <Footer hideMainNavigation={true} />
+      {effectiveDomain && effectiveLocation ? (
+        <DynamicFooter location={effectiveLocation} domain={effectiveDomain} />
+      ) : (
+        <Footer hideMainNavigation={true} />
+      )}
       <WhatsAppFloat />
     </main>
   )
